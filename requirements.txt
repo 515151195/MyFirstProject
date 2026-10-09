@@ -1,0 +1,11 @@
+# Runtime dependencies. Keep these versions aligned with pyproject.toml.
+fastapi==0.141.1
+uvicorn==0.53.0
+tortoise-orm==1.1.8
+aiomysql==0.3.2
+pydantic==2.13.5
+pydantic-settings==2.15.0
+email-validator==2.3.0
+PyJWT==2.15.0
+passlib==1.7.4
+argon2-cffi==25.1.0
