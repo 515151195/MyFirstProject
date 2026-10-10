@@ -18,7 +18,7 @@ class Membership(BaseModel, TimestampMixin):
     user = fields.ForeignKeyField("models.User", related_name="memberships")
     org = fields.ForeignKeyField("models.Organization", related_name="members")
     role = fields.CharEnumField(OrgMemberRole)
-    status = fields.CharEnumField(MembershipStatus, default=MembershipStatus.INVITED)
+    status = fields.CharEnumField(MembershipStatus, default=MembershipStatus.ACTIVE)
 
     class Meta:
         table = "Membership"
@@ -38,6 +38,6 @@ class Invitation(BaseModel, TimestampMixin):
     token_hash = fields.CharField(max_length=255)
     expire_at = fields.DatetimeField()
     status = fields.CharEnumField(InvitationStatus, default=InvitationStatus.PENDING)
-    
+
     class Meta:
         table = "invitations"
