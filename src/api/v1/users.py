@@ -7,6 +7,7 @@ from schemas.users import UserOut, User_info_change
 from core.dependencies import require_admin, get_current_user
 from typing import Literal
 from schemas.roles import RoleOut
+from services.user_service import user_service
 
 router = APIRouter()
 
@@ -24,17 +25,11 @@ async def search_user(user_id: int | None = Query(None, description="user's id, 
     if not username and not user_id:
         raise HTTPException(status_code=400, detail="Must provide user_id or username")
     if not user_id :
-        user = await User.filter(username=username).first()
+        return user_service.get_user_by_username(username=username)
     elif user_id and not username:
-        user=await User.filter(id=user_id).first()
+        return user_service.get_user_by_id(user_id=user_id)
     else:
-        user=await User.filter(id=user_id).first()
-        if not user or user.username != username:
-            raise HTTPException(status_code=400, detail="Wrong id or username")
-    if not user:
-        raise HTTPException(status_code=404, detail="User Not Found")
-    data = UserOut.model_validate(user)
-    return ResponseBase[UserOut](msg="search success", data=data)
+        return user_service.get_user_by_id(user_id=user_id)
 
 @router.get("/users")
 async def search_users(
@@ -43,88 +38,35 @@ async def search_users(
         page_size: int = Query(10, ge=1, le=50, description="page size"),
         user_me: User = Depends(get_current_user),
 ) -> ResponseBase[list[UserOut]]:
-    queryset = User.all()
-    if keyword:
-        queryset = queryset.filter(username__icontains=keyword)
-    total = await queryset.count()
-    offset = (page-1)*page_size
-    user_list = await queryset.offset(offset).limit(page_size).prefetch_related("roles").all()
-    data = [UserOut.model_validate(each) for each in user_list]
-    return ResponseBase[list[UserOut]](msg="users get successfully", data=data, extra_data=total)
+    return user_service.get_users_list(
+        keyword= keyword,
+        page= page,
+        page_size= page_size
+    )
 
 @router.patch("/username")
 async def change_username(new_username: str = Body(...), user: User = Depends(get_current_user)) -> ResponseBase[UserOut]:
-    try_name = User_info_change(username=new_username)
-    if await User.filter(username=new_username).exists():
-        raise HTTPException(status_code=400, detail="Username already exists")
-    user.username = new_username
-    await user.save()
-    data = UserOut.model_validate(user)
-    return ResponseBase[UserOut](code=200, msg="username change success", data=data)
+    return user_service.change_username(user=user, new_username=new_username)
 
 @router.patch("/email")
 async def change_email(new_email: EmailStr = Body(...), user: User = Depends(get_current_user)) -> ResponseBase[UserOut]:
-    if await User.filter(email=new_email).exists():
-        raise HTTPException(status_code=400, detail="Email already exists")
-    user.email = new_email
-    await user.save()
-    data = UserOut.model_validate(user)
-    return ResponseBase[UserOut](code=200, msg="email changed", data=data)
+    return user_service.change_email(user=user, new_email=new_email)
 
 @router.patch("/disable-user/{username}")
 async def disable_user(username: str, user: User = Depends(require_admin)) -> ResponseBase[UserOut]:
-    if username == user.username:
-        raise HTTPException(status_code=400, detail="You cannot disable yourself")
-    chosen_user = await User.filter(username=username).first()
-    if not chosen_user:
-        raise HTTPException(status_code=404, detail="User Not Found")
-    chosen_user.is_active = False
-    await chosen_user.save()
-    data = UserOut.model_validate(chosen_user)
-    return ResponseBase[UserOut](msg="Disabled success", data=data)
+    return user_service.disable_user(username=username, user=user)
 
 @router.patch("/set-superuser/{username}")
 async def set_superuser(username: str, user: User = Depends(require_admin)) -> ResponseBase:
-    chosen_user = await User.filter(username=username).prefetch_related("roles").first()
-    if not chosen_user:
-        raise HTTPException(status_code=404, detail="User doesn't exist")
-    admin_role = await Role.filter(name="admin").first()
-    if not admin_role:
-        raise HTTPException(status_code=404, detail="Role Not Found")
-    chosen_user.is_superuser = True
-    await chosen_user.roles.add(admin_role)
-    await chosen_user.save()
-    return ResponseBase(msg="Set superuser success")
+    return user_service.set_superuser(username=username)
 
 @router.patch("/remove_superuser/{username}")
 async def remove_superuser(username: str, user: User = Depends(require_admin)) -> ResponseBase:
-    chosen_user = await User.filter(username=username).prefetch_related("roles").first()
-    if not chosen_user:
-        raise HTTPException(status_code=404, detail="User Not Found")
-    if chosen_user.username == user.username:
-        raise HTTPException(status_code=400, detail="Cannot remove yourself! ")
-    if not chosen_user.is_superuser:
-        raise HTTPException(status_code=400, detail="The chosen user is not superuser! ")
-    admin_role = await Role.filter(name="admin").first()
-    if not admin_role:
-        raise HTTPException(status_code=404, detail="Role Not Found")
-    chosen_user.is_superuser = False
-    await chosen_user.roles.remove(admin_role)
-    await chosen_user.save()
-    return ResponseBase(msg="The superuser removed successfully")
+    return user_service.remove_superuser(username=username, user=user)
 
 @router.delete("/delete/{user_id}")
 async def user_delete(user_id: int, user_me: User = Depends(require_admin)):
-    if user_id == user_me.id:
-        raise HTTPException(status_code=400, detail="You cannot delete yourself")
-    user = await User.filter(id=user_id).first()
-    if user is None:
-        raise HTTPException(status_code=404, detail="User doesn't exist")
-    elif user.is_superuser:
-        raise HTTPException(status_code=403, detail="You have no right to do this")
-    else:
-        await user.delete()
-        return ResponseBase(code=200, msg="Deleted successfully", data=None)
+    return user_service.user_delete(user_id, user_me)
 
 @router.delete("/delete-me")
 async def delete_me(

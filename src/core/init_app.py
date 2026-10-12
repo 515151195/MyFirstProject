@@ -7,7 +7,10 @@ from schemas.users import UserCreate
 from .middlewares import RequestLoggingMiddleware
 from fastapi import FastAPI
 from fastapi.exceptions import HTTPException
-from .exceptions import HttpExcHandle
+from .exceptions import (HttpExcHandle, DoesNotExistHandle, IntegrityHandle,
+                         RequestValidationHandle, ResponseValidationHandle, UnhandledExceptionHandle)
+from tortoise.exceptions import DoesNotExist, IntegrityError
+from fastapi.exceptions import RequestValidationError, ResponseValidationError
 
 import logging
 logger = logging.getLogger(__name__)
@@ -20,6 +23,11 @@ def make_middlewares():
 
 def register_exceptions(app: FastAPI):
     app.add_exception_handler(HTTPException, HttpExcHandle)
+    app.add_exception_handler(DoesNotExist, DoesNotExistHandle)
+    app.add_exception_handler(IntegrityError, IntegrityHandle)
+    app.add_exception_handler(RequestValidationError, RequestValidationHandle)
+    app.add_exception_handler(ResponseValidationError, ResponseValidationHandle)
+    app.add_exception_handler(Exception, UnhandledExceptionHandle)
 
 async def init_db() -> None:
     logger.info("Start database initial")

@@ -5,24 +5,17 @@ from schemas.roles import RoleCreate, RoleOut
 from repositories.role import role_repository
 from core.dependencies import require_admin
 from schemas.base import ResponseBase
+from services import role_service
 
 router = APIRouter()
 
 @router.get("/role_desc")
 async def get_desc(name: str, user: User = Depends(require_admin)) -> ResponseBase[str]:
-    role = await Role.filter(name=name).first()
-    if not role:
-        raise HTTPException(status_code=404, detail="Role Not Found")
-    data = role.desc
-    return ResponseBase[str](msg="success", data=data)
+    return role_service.get_desc_by_name(name=name)
 
 @router.post("/role")
 async def create_role(role_in: RoleCreate, user: User = Depends(require_admin)) -> ResponseBase[RoleOut]:
-    if await Role.filter(name=role_in.name).exists():
-        raise HTTPException(status_code=400, detail="Role already exists")
-    role = await role_repository.create_role(role_in)
-    data = RoleOut.model_validate(role)
-    return ResponseBase[RoleOut](code=201, msg="created success", data=data)
+    return role_service.create_new_role(role_in=role_in)
 
 """
 @router.patch("/name")
@@ -39,7 +32,7 @@ async def change_role_name(old_name: str, new_name: str, user: User = Depends(re
     await role.save()
     data=RoleOut.model_validate(role)
     return ResponseBase[RoleOut](code=201, msg="change name success", data=data)
-"""
+
 
 @router.patch("/desc")
 async def change_role_desc(name: str, new_desc: str, user: User = Depends(require_admin)) -> ResponseBase[RoleOut]:
@@ -52,7 +45,7 @@ async def change_role_desc(name: str, new_desc: str, user: User = Depends(requir
     data = RoleOut.model_validate(role)
     return ResponseBase[RoleOut](code=201, msg="change desc success", data=data)
 
-"""
+
 @router.delete("/role")
 async def delete_role(name: str, user: User = Depends(require_admin)) -> ResponseBase:
     role = await Role.filter(name=name).first()

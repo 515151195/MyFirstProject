@@ -2,7 +2,7 @@ import secrets
 import hashlib
 
 from models import Organization, Invitation, User, Membership
-from schemas.invitation import InvitationCreate
+from schemas.invitation import InvitationCreate, InvitationOut
 
 from fastapi import HTTPException
 from datetime import datetime, UTC
@@ -17,11 +17,12 @@ class InvitationRepository:
             raise HTTPException(status_code=404, detail="Organization Not Found!")
         raw_dict["org"]=org
         del raw_dict["org_id"]
-        await Invitation.create(**raw_dict,
+        inv = await Invitation.create(**raw_dict,
                          inviter=org.owner,
                          token_hash=token_hash
         )
-        return raw_token
+        data = InvitationOut.model_validate(inv)
+        return raw_token, data
 
     async def accept_invitation(self, current_user: User, inv_info: Invitation, token: str):
         token_hashed = hashlib.sha256(token.encode()).hexdigest()
@@ -31,7 +32,7 @@ class InvitationRepository:
             raise HTTPException(status_code=401, detail="Wrong token")
         if inv_info.expire_at < datetime.now(UTC):
             raise HTTPException(status_code=400, detail="Invitation has expired")
-        exist_membership = await Membership.filter(user=current_user, org=inv_info.org, role=inv_info.role).first()
+        exist_membership = await Membership.filter(user=current_user, org=inv_info.org).first()
         if exist_membership:
             raise HTTPException(status_code=400, detail="You are already a member of this organization")
         new_membership = await Membership.create(
