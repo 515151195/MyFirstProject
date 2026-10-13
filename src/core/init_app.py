@@ -20,6 +20,7 @@ def make_middlewares():
     middleware = [
         Middleware(RequestLoggingMiddleware)
     ]
+    return middleware
 
 def register_exceptions(app: FastAPI):
     app.add_exception_handler(HTTPException, HttpExcHandle)

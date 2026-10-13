@@ -9,7 +9,7 @@ from tortoise.exceptions import IntegrityError
 from tortoise.transactions import in_transaction
 
 class OrgService:
-    async def create_org(org_in: OrgCreate, user: User) -> OrgOut:
+    async def create_org(self, org_in: OrgCreate, user: User) -> OrgOut:
         exist_org = await Organization.filter(name=org_in.name).exists()
         if exist_org:
             raise HTTPException(status_code=400, detail="Already exists the same name")
@@ -37,7 +37,7 @@ class OrgService:
         return users
 
     async def get_user_orgs(self, user_id: int) -> list[OrgOut]:
-        memberships = await Membership.filter(user__id=user_id).prefetch_related("org").all()
+        memberships = await Membership.filter(user__id=user_id, status=MembershipStatus.ACTIVE).prefetch_related("org").all()
         orgs = [OrgOut.model_validate(item.org) for item in memberships]
         return orgs
 

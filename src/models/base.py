@@ -18,6 +18,10 @@ class OrgMemberRole(str, Enum):
     MEMBER = "member"
     VIEWER = "viewer"
 
+class OrgMemRoleInv(str, Enum):
+    MEMBER = "member"
+    VIEWER = "viewer"
+
 class InvitationStatus(str, Enum):
     PENDING = "pending"
     USED = "used"

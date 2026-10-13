@@ -53,8 +53,8 @@ class Settings(BaseSettings):
                     "migrations": "models.migrations",
                 }
             },
-            "use_tz" : False,
-            "timezone": "Asia/Shanghai",
+            "use_tz" : True,
+            "timezone": "UTC",
         }
 
 

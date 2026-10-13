@@ -2,13 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 
 from schemas.organization import OrgCreate, OrgOut
 from schemas.membership import MembershipOut
-from schemas.invitation import InvitationOut, InvitationCreate
 from schemas.base import ResponseBase
 from schemas.users import UserOut
 from core.dependencies import get_current_user, require_admin
 from services import org_service
 from models import Organization, User
-from core.permissions import require_org_role, require_org_owner
+from core.permissions import require_org_role, require_org_owner, require_org_members
 
 
 router = APIRouter()
@@ -19,21 +18,27 @@ async def create_organization(org_in: OrgCreate, user = Depends(get_current_user
     return ResponseBase[OrgOut](code=201, msg="Organization created success", data=data)
 
 @router.get("/organization/information", summary="Get information by name of organization")
-async def get_info_org(name: str, user = Depends(get_current_user)) -> ResponseBase[OrgOut]:
-    org = await Organization.filter(name=name).first()
-    if not org:
-        raise HTTPException(status_code=404, detail="Organization Not Found")
-    data = OrgOut.model_validate(org)
-    return ResponseBase(msg="Organization information is listed", data=data)
+async def get_info_org(org_id: int, user = Depends(get_current_user)) -> ResponseBase[OrgOut]:
+    if await require_org_members(user.id, org_id):
+        org = await Organization.filter(id=org_id).first()
+        if not org:
+            raise HTTPException(status_code=404, detail="Organization Not Found")
+        data = OrgOut.model_validate(org)
+        return ResponseBase(msg="Organization information is listed", data=data)
+    else:
+        raise HTTPException(403, "No permission")
 
 @router.get("/organization/{org_id}/members", summary="Get users of organization by id")
-async def get_org_members(org_id: int, user = Depends(require_admin)) -> ResponseBase[list[UserOut]]:
-    data = await org_service.get_org_users(org_id)
-    return ResponseBase(msg="Users as list", data=data)
+async def get_org_members(org_id: int, user = Depends(get_current_user)) -> ResponseBase[list[UserOut]]:
+    if await require_org_role(user.id, org_id):
+        data = await org_service.get_org_users(org_id)
+        return ResponseBase(msg="Users as list", data=data)
+    else:
+        raise HTTPException(403, "No permission to do this")
 
-@router.get("user/{user_id}/organizations", summary="Get organizations of user by id")
-async def get_member_orgs(user_id: int, user = Depends(require_admin)) -> ResponseBase[list[OrgOut]]:
-    data = await org_service.get_user_orgs(user_id)
+@router.get("/user/{user_id}/organizations", summary="Get organizations of user by id")
+async def get_my_orgs(user = Depends(get_current_user)) -> ResponseBase[list[OrgOut]]:
+    data = await org_service.get_user_orgs(user.id)
     return ResponseBase(msg="Organizations as list", data=data)
 
 @router.patch("/organization/{org_id}/name", summary="Change organization name")

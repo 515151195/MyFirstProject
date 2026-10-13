@@ -7,4 +7,4 @@ class ResponseBase(BaseModel, Generic[T]):
     code: int = 200
     msg: str
     data: T | None = None
-    extra_data: int | None = None
+    extra_data: Any | None = None

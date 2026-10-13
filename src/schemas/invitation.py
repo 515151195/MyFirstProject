@@ -1,12 +1,13 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, computed_field
 from datetime import datetime
 
 from models.organization import OrgMemberRole, InvitationStatus
+from models.base import OrgMemRoleInv
 
 class InvitationCreate(BaseModel):
     org_id: int
     invitee_email: EmailStr
-    role: OrgMemberRole
+    role: OrgMemRoleInv
     expire_at: datetime
 
 
