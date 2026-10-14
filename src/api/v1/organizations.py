@@ -36,7 +36,7 @@ async def get_org_members(org_id: int, user = Depends(get_current_user)) -> Resp
     else:
         raise HTTPException(403, "No permission to do this")
 
-@router.get("/user/{user_id}/organizations", summary="Get organizations of user by id")
+@router.get("/me/organizations", summary="Get organizations of user by id")
 async def get_my_orgs(user = Depends(get_current_user)) -> ResponseBase[list[OrgOut]]:
     data = await org_service.get_user_orgs(user.id)
     return ResponseBase(msg="Organizations as list", data=data)

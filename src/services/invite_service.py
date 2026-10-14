@@ -22,33 +22,31 @@ class InvService:
                          token: str,
                          inv_id: int,
     ) -> MembershipOut:
-        invitation = await Invitation.filter(id=inv_id).first()
-        if not invitation:
-            raise HTTPException(404, "Invitation not found")
-        if not invitation.status == InvitationStatus.PENDING:
-            raise HTTPException(400, "Invalid invitation")
-        membership = await invitation_repository.accept_invitation(user, invitation, token)
+        membership = await invitation_repository.accept_invitation(user, inv_id, token)
         return MembershipOut.model_validate(membership)
 
     async def disable_inv(self,
                           inv_id: int,
                           user: User,
     ) -> InvitationOut:
-        inv = await Invitation.filter(id=inv_id).prefetch_related("org", "inviter").first()
-        if not inv:
-            raise HTTPException(404, "Invitation not found")
-        if inv.status == InvitationStatus.REVOKED:
-            raise HTTPException(400, "Disabled invitation")
-        if inv.status == InvitationStatus.USED:
-            raise HTTPException(400, "Invitation has been used")
-        if await require_org_role(user.id, inv.org.id):
-            inv.status = InvitationStatus.REVOKED
-            await inv.save()
-            return InvitationOut(**await inv.to_dict(),
-                                 org_name=inv.org.name,
-                                 inviter_name=inv.inviter.username,
-            )
-        raise HTTPException(403, "No permission")
+        async with in_transaction():
+            inv = await Invitation.filter(id=inv_id)\
+                .select_for_update()\
+                .prefetch_related("org", "inviter").first()
+            if not inv:
+                raise HTTPException(404, "Invitation not found")
+            if inv.status == InvitationStatus.REVOKED:
+                raise HTTPException(400, "Disabled invitation")
+            if inv.status == InvitationStatus.USED:
+                raise HTTPException(400, "Invitation has been used")
+            if await require_org_role(user.id, inv.org.id):
+                inv.status = InvitationStatus.REVOKED
+                await inv.save()
+                return InvitationOut(**await inv.to_dict(),
+                                     org_name=inv.org.name,
+                                     inviter_name=inv.inviter.username,
+                )
+            raise HTTPException(403, "No permission")
 
 
 

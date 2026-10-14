@@ -3,6 +3,9 @@ from .base import (TimestampMixin, BaseModel, OrgStatus,
                    InvitationStatus)
 
 from tortoise import fields
+from datetime import datetime, timedelta
+
+import pytz
 
 class Organization(BaseModel, TimestampMixin):
     name = fields.CharField(max_length=32, min_length=2, unique=True, index=True)
@@ -36,7 +39,9 @@ class Invitation(BaseModel, TimestampMixin):
     invitee_email = fields.CharField(max_length=128)
     role = fields.CharEnumField(OrgMemberRole)
     token_hash = fields.CharField(max_length=255)
-    expire_at = fields.DatetimeField()
+    expire_at = fields.DatetimeField(
+        default=lambda: datetime.now(pytz.UTC) + timedelta(days=7)
+    )
     status = fields.CharEnumField(InvitationStatus, default=InvitationStatus.PENDING)
 
     class Meta:

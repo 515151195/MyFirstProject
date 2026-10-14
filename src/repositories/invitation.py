@@ -2,7 +2,7 @@ import secrets
 import hashlib
 
 from models import Organization, Invitation, User, Membership
-from models.base import InvitationStatus
+from models.base import InvitationStatus, OrgStatus
 from schemas.invitation import InvitationCreate, InvitationOut
 
 from fastapi import HTTPException
@@ -29,15 +29,22 @@ class InvitationRepository:
                              inviter_name=inv.inviter.username)
         return raw_token, data
 
-    async def accept_invitation(self, current_user: User, inv_info: Invitation, token: str):
+    async def accept_invitation(self, current_user: User, inv_id: int, token: str):
         token_hashed = hashlib.sha256(token.encode()).hexdigest()
-        if current_user.email != inv_info.invitee_email:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
-        if token_hashed != inv_info.token_hash:
-            raise HTTPException(status_code=401, detail="Wrong token")
-        if inv_info.expire_at < datetime.now(UTC):
-            raise HTTPException(status_code=400, detail="Invitation has expired")
         async with in_transaction():
+            inv_info = await Invitation.filter(id=inv_id).select_related("org").select_for_update().first()
+            if not inv_info:
+                raise HTTPException(404, "Invitation not found")
+            if inv_info.status != InvitationStatus.PENDING:
+                raise HTTPException(400, "Invalid invitation")
+            if current_user.email != inv_info.invitee_email:
+                raise HTTPException(status_code=403, detail="Insufficient permissions")
+            if token_hashed != inv_info.token_hash:
+                raise HTTPException(status_code=401, detail="Wrong token")
+            if inv_info.expire_at < datetime.now(UTC):
+                raise HTTPException(status_code=400, detail="Invitation has expired")
+            if inv_info.org.status != OrgStatus.ACTIVE:
+                raise HTTPException(400, "The organization is NOT active")
             exist_membership = await Membership.filter(user=current_user, org=inv_info.org).first()
             if exist_membership:
                 raise HTTPException(status_code=400, detail="You are already a member of this organization")
