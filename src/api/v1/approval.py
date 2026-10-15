@@ -10,9 +10,10 @@ from repositories import approval_repository
 
 router = APIRouter()
 
-@router.post("/draft", summary="Create approval draft")
-async def create_draft(approval_data: ApprovalCreate, user: User = Depends(get_current_user)) -> ResponseBase[ApprovalRequestOut]:
+@router.post("/organization/{org_id}/draft", summary="Create approval draft")
+async def create_draft(org_id: int, approval_data: ApprovalCreate, user: User = Depends(get_current_user)) -> ResponseBase[ApprovalRequestOut]:
     data = await approval_service.create_draft(
+        org_id=org_id,
         title=approval_data.title,
         applicant_id=user.id,
         approver_id=approval_data.approver_id,

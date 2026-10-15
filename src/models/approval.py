@@ -6,6 +6,7 @@ from tortoise import fields
 class ApprovalRequest(BaseModel, TimestampMixin):
     applicant = fields.ForeignKeyField("models.User", related_name="my_approval_requests")
     approver = fields.ForeignKeyField("models.User", related_name="to_approve_requests", null=True)
+    organization = fields.ForeignKeyField("models.Organization", related_name="approvals_of_org")
     status = fields.CharEnumField(ApprovalStatus, default=ApprovalStatus.DRAFT)
     title = fields.CharField(max_length=200)
     content = fields.TextField(null=True)

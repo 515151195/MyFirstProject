@@ -1,6 +1,6 @@
 from schemas.approval import ApprovalCreate, ApprovalRequestOut, ApprovalRecordOut
-from models import ApprovalRequest
-from models.base import ApprovalStatus, ApprovalAction
+from models import ApprovalRequest, User, Membership
+from models.base import ApprovalStatus, ApprovalAction, MembershipStatus
 from repositories import approval_repository
 from core.status_machine import is_valid_transition
 
@@ -9,12 +9,20 @@ from tortoise.transactions import in_transaction
 
 class ApprovalService:
     async def create_draft(self,
+                           org_id: int,
                            title: str,
                            applicant_id: int,
-                           approver_id: int|None = None,
+                           approver_id: int,
                            content: str|None = None,
     ) -> ApprovalRequestOut:
+        applicant_mem = await Membership.get_or_none(user_id=applicant_id, org_id=org_id)
+        approver_mem = await Membership.get_or_none(user_id=approver_id, org_id=org_id)
+        if not applicant_mem or not approver_mem or (
+                applicant_mem.status!=MembershipStatus.ACTIVE
+                or approver_mem.status!= MembershipStatus.ACTIVE):
+            raise HTTPException(400, "Invalid parameter")
         req = await ApprovalRequest.create(
+            organization_id=org_id,
             applicant_id=applicant_id,
             approver_id=approver_id,
             title=title,
