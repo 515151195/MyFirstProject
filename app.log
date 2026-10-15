@@ -1,2 +1,7 @@
 Start database initial
 Database initialized success
+request started method=GET, path=/docs
+request finished method=GET path=/docs elapsed_ms=0.75
+request started method=GET, path=/openapi.json
+request finished method=GET path=/openapi.json elapsed_ms=52.10
+Tortoise-ORM shutdown

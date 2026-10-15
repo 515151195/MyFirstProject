@@ -28,6 +28,19 @@ class InvitationStatus(str, Enum):
     EXPIRED = "expired"
     REVOKED = "revoked"
 
+class ApprovalStatus(str, Enum):
+    DRAFT = "draft"
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+
+class ApprovalAction(str, Enum):
+    APPROVE = "approve"
+    REJECT = "reject"
+    CANCEL = "cancel"
+    SUBMIT = "submit"
+
 class BaseModel(models.Model):
     id = fields.BigIntField(pk=True, index=True)
 
