@@ -6,7 +6,13 @@ from tortoise.expressions import Q
 
 
 class ApprovalRepo:
-    async def get_by_id(self, id: int):
+    async def get_by_id(self, id: int, for_update: bool|None = False):
+        q = ApprovalRequest
+        if for_update:
+            q = q.select_for_update()
+        return await q.get_or_none(id=id)
+
+    async def get_by_id2(self, id: int):
         return await ApprovalRequest.get_or_none(id=id)
 
     async def create_record(self,

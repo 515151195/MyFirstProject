@@ -22,7 +22,7 @@ class ApprovalRequestOut(BaseModel):
 
 class ApprovalRecordOut(BaseModel):
     id: int
-    approval_id: int
+    approval_request_id: int
     operator_id: int
     action: str
     comment: str | None

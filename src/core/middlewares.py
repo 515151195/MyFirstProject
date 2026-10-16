@@ -1,11 +1,15 @@
 import logging
 import time
+import hashlib
+import json
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from fastapi import Request
+from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.responses import Response
 
+from models import IdempotencyRecord
+from models.base import IdeStatus
 from log.context import reset_request_id, set_request_id
 
 
@@ -48,3 +52,41 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             return response
         finally:
             reset_request_id(token)
+
+
+class IdempotencyMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
+        idempotency_key = request.headers.get("Idempotency-Key")
+        if not idempotency_key:
+            return await call_next(request)
+
+        body_bytes = await request.body()
+        req_info = f"{request.method}{request.url.path}{body_bytes.decode('utf-8')}"
+        request_digest = hashlib.sha256(req_info.encode()).hexdigest()
+
+        record = await IdempotencyRecord.get_or_none(idempotency_key=idempotency_key)
+        if record:
+            if record.status == IdeStatus.SUCCESS:
+                return JSONResponse(content=record.response_data)
+            elif record.status == IdeStatus.PENDING:
+                return HTTPException(status_code=409, detail="Request is processing, please retry later")
+            elif record.status == IdeStatus.FAILED:
+                raise HTTPException(status_code=400, detail="This idempotency key already failed, please use new key")
+        record = await IdempotencyRecord.create(
+            idempotency_key=idempotency_key,
+            request_digest=request_digest,
+            response_data=None,
+            status=IdeStatus.PENDING,
+        )
+        response = await call_next(request)
+
+        resp_body = b""
+        async for chunk in response.body_iterator:
+            resp_body += chunk
+        response.body_iterator = iter([resp_body])
+        resp_json = json.loads(resp_body)
+
+        record.status = IdeStatus.SUCCESS
+        record.response_data = resp_json
+        await record.save()
+        return response

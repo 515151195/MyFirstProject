@@ -3,6 +3,11 @@ from tortoise import fields, models
 from datetime import datetime
 from enum import Enum
 
+class IdeStatus(str, Enum):
+    PENDING = "pending"
+    SUCCESS = "success"
+    FAILED = "failed"
+
 class OrgStatus(str, Enum):
     ACTIVE = "active"
     DISABLED = "disabled"

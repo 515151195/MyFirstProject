@@ -53,14 +53,6 @@ async def cancel_request(
     data = await approval_service.cancel(approval_id, user.id, "cancel my request")
     return ResponseBase(code=201, msg="Request canceled success", data=data)
 
-@router.get("/{approval_id}", summary="Get information of approval")
-async def get_approval_info(
-        approval_id: int,
-        user: User = Depends(get_current_user)
-) -> ResponseBase[ApprovalRequestOut]:
-    data = await approval_service.get_one_info(approval_id, user.id)
-    return ResponseBase(code=200, msg="Request information get success", data=data)
-
 @router.get("/list", summary="List approvals of applicants or approvers")
 async def get_approval_list(
         is_applicant: bool = False,
@@ -69,3 +61,11 @@ async def get_approval_list(
     requests = await approval_repository.get_approval_list(is_applicant, user.id)
     data = [ApprovalRequestOut.model_validate(item) for item in requests]
     return ResponseBase(code=200, msg="Approvals list get success", data=data)
+
+@router.get("/{approval_id}", summary="Get information of approval")
+async def get_approval_info(
+        approval_id: int,
+        user: User = Depends(get_current_user)
+) -> ResponseBase[ApprovalRequestOut]:
+    data = await approval_service.get_one_info(approval_id, user.id)
+    return ResponseBase(code=200, msg="Request information get success", data=data)

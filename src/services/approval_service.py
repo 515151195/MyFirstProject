@@ -1,6 +1,6 @@
 from schemas.approval import ApprovalCreate, ApprovalRequestOut, ApprovalRecordOut
-from models import ApprovalRequest, User, Membership
-from models.base import ApprovalStatus, ApprovalAction, MembershipStatus
+from models import ApprovalRequest, Organization, Membership
+from models.base import ApprovalStatus, ApprovalAction, MembershipStatus, OrgStatus
 from repositories import approval_repository
 from core.status_machine import is_valid_transition
 
@@ -15,12 +15,17 @@ class ApprovalService:
                            approver_id: int,
                            content: str|None = None,
     ) -> ApprovalRequestOut:
+        if applicant_id == approver_id:
+            raise HTTPException(400, "You cannot set yourself as approver")
         applicant_mem = await Membership.get_or_none(user_id=applicant_id, org_id=org_id)
         approver_mem = await Membership.get_or_none(user_id=approver_id, org_id=org_id)
         if not applicant_mem or not approver_mem or (
                 applicant_mem.status!=MembershipStatus.ACTIVE
                 or approver_mem.status!= MembershipStatus.ACTIVE):
             raise HTTPException(400, "Invalid parameter")
+        org = await Organization.get_or_none(id=org_id)
+        if org and org.status != OrgStatus.ACTIVE:
+            raise HTTPException(400, "Organization is not active")
         req = await ApprovalRequest.create(
             organization_id=org_id,
             applicant_id=applicant_id,
@@ -37,7 +42,7 @@ class ApprovalService:
             user_id: int,
     ) -> ApprovalRecordOut:
         async with in_transaction():
-            approval = await approval_repository.get_by_id(approval_id)
+            approval = await approval_repository.get_by_id(approval_id, for_update=True)
             if not approval:
                 raise HTTPException(404, "Approval request not found")
             if approval.applicant_id != user_id:
@@ -51,7 +56,7 @@ class ApprovalService:
 
     async def approve(self, approval_id: int, operator_id: int, comment: str | None) -> ApprovalRecordOut:
         async with in_transaction():
-            req = await approval_repository.get_by_id(approval_id)
+            req = await approval_repository.get_by_id(approval_id, for_update=True)
             if not req:
                 raise HTTPException(404, "Approval request not found")
             if req.approver_id != operator_id:
@@ -68,7 +73,7 @@ class ApprovalService:
 
     async def reject(self, approval_id: int, operator_id: int, comment: str) -> ApprovalRecordOut:
         async with in_transaction():
-            req = await approval_repository.get_by_id(approval_id)
+            req = await approval_repository.get_by_id(approval_id, for_update=True)
             if not req:
                 raise HTTPException(404, "Approval request not found")
             if req.approver_id != operator_id:
@@ -85,7 +90,7 @@ class ApprovalService:
 
     async def cancel(self, approval_id: int, operator_id: int, comment: str|None) -> ApprovalRecordOut:
         async with in_transaction():
-            req = await approval_repository.get_by_id(approval_id)
+            req = await approval_repository.get_by_id(approval_id, for_update=True)
             if not req:
                 raise HTTPException(404, "Approval request not found")
             if req.applicant_id != operator_id:

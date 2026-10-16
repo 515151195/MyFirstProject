@@ -4,7 +4,7 @@ from models import User, Role
 from repositories import user_repository
 from fastapi.middleware import Middleware
 from schemas.users import UserCreate
-from .middlewares import RequestLoggingMiddleware
+from .middlewares import RequestLoggingMiddleware, IdempotencyMiddleware
 from fastapi import FastAPI
 from fastapi.exceptions import HTTPException
 from .exceptions import (HttpExcHandle, DoesNotExistHandle, IntegrityHandle,
@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 
 def make_middlewares():
     middleware = [
-        Middleware(RequestLoggingMiddleware)
+        Middleware(RequestLoggingMiddleware),
+        Middleware(IdempotencyMiddleware)
     ]
     return middleware
 
