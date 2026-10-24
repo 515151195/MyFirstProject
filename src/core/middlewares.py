@@ -7,6 +7,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.responses import Response
+from tortoise.transactions import in_transaction
 
 from models import IdempotencyRecord
 from models.base import IdeStatus
@@ -61,32 +62,48 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         body_bytes = await request.body()
+        request._body = body_bytes
         req_info = f"{request.method}{request.url.path}{body_bytes.decode('utf-8')}"
         request_digest = hashlib.sha256(req_info.encode()).hexdigest()
 
-        record = await IdempotencyRecord.get_or_none(idempotency_key=idempotency_key)
-        if record:
-            if record.status == IdeStatus.SUCCESS:
-                return JSONResponse(content=record.response_data)
-            elif record.status == IdeStatus.PENDING:
-                return HTTPException(status_code=409, detail="Request is processing, please retry later")
-            elif record.status == IdeStatus.FAILED:
-                raise HTTPException(status_code=400, detail="This idempotency key already failed, please use new key")
-        record = await IdempotencyRecord.create(
+        record, created = await IdempotencyRecord.get_or_create(
             idempotency_key=idempotency_key,
-            request_digest=request_digest,
-            response_data=None,
-            status=IdeStatus.PENDING,
+            defaults={
+                "request_digest": request_digest,
+                "response_data": None,
+                "status": IdeStatus.PENDING,
+            }
         )
-        response = await call_next(request)
+        if not created:
+            if record.request_digest == request_digest:
+                if record.status == IdeStatus.SUCCESS:
+                    return JSONResponse(content=record.response_data)
+                elif record.status == IdeStatus.PENDING:
+                    raise HTTPException(status_code=409, detail="Request is processing, please retry later")
+                elif record.status == IdeStatus.FAILED:
+                    raise HTTPException(status_code=400, detail="This idempotency key already failed, please use new key")
+            else:
+                raise HTTPException(status_code=409, detail="Idempotency key reused with different request")
+
+        try:
+            response = await call_next(request)
+        except Exception:
+            record.status = IdeStatus.FAILED
+            await record.save()
+            raise
 
         resp_body = b""
         async for chunk in response.body_iterator:
             resp_body += chunk
-        response.body_iterator = iter([resp_body])
+        async def async_body_iter():
+            yield resp_body
+        response.body_iterator = async_body_iter()
         resp_json = json.loads(resp_body)
 
-        record.status = IdeStatus.SUCCESS
+        if 200 <= response.status_code < 300:
+            record.status = IdeStatus.SUCCESS
+        else:
+            record.status = IdeStatus.FAILED
         record.response_data = resp_json
         await record.save()
         return response

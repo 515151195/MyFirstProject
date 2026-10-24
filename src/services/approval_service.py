@@ -1,8 +1,9 @@
-from schemas.approval import ApprovalCreate, ApprovalRequestOut, ApprovalRecordOut
-from models import ApprovalRequest, Organization, Membership
+from schemas.approval import ApprovalRequestOut, ApprovalRecordOut
+from models import ApprovalRequest, Organization, Membership, OutboxMessage
 from models.base import ApprovalStatus, ApprovalAction, MembershipStatus, OrgStatus
 from repositories import approval_repository
 from core.status_machine import is_valid_transition
+from services import outbox_service
 
 from fastapi import HTTPException
 from tortoise.transactions import in_transaction
@@ -26,14 +27,15 @@ class ApprovalService:
         org = await Organization.get_or_none(id=org_id)
         if org and org.status != OrgStatus.ACTIVE:
             raise HTTPException(400, "Organization is not active")
-        req = await ApprovalRequest.create(
-            organization_id=org_id,
-            applicant_id=applicant_id,
-            approver_id=approver_id,
-            title=title,
-            content=content,
-            status=ApprovalStatus.DRAFT,
-        )
+        async with in_transaction():
+            req = await ApprovalRequest.create(
+                organization_id=org_id,
+                applicant_id=applicant_id,
+                approver_id=approver_id,
+                title=title,
+                content=content,
+                status=ApprovalStatus.DRAFT,
+            )
         return ApprovalRequestOut.model_validate(req)
 
     async def submit(
@@ -51,6 +53,13 @@ class ApprovalService:
                 raise HTTPException(400, f"Cannot submit from status {approval.status}")
             approval.status = ApprovalStatus.PENDING
             await approval.save()
+            payload = {
+                "approval_id": approval.id,
+                "applicant_id": approval.applicant.id,
+                "approver_id": approval.approver.id,
+                "title": approval.title,
+            }
+            await outbox_service.publish_event("approval.submit", payload)
             rec = await approval_repository.create_record(approval, user_id, ApprovalAction.SUBMIT, comment="Submit approval")
             return ApprovalRecordOut.model_validate(rec)
 
@@ -69,6 +78,15 @@ class ApprovalService:
             req.status = target_status
             await req.save()
             rec = await approval_repository.create_record(req, operator_id, action=ApprovalAction.APPROVE, comment=comment)
+            payload = {
+                "approval_id": req.id,
+                "applicant_id": req.applicant.id,
+                "approver_id": req.approver.id,
+                "title": req.title,
+                "action": ApprovalAction.APPROVE,
+                "comment": rec.comment,
+            }
+            await outbox_service.publish_event("approval.passed", payload)
             return ApprovalRecordOut.model_validate(rec)
 
     async def reject(self, approval_id: int, operator_id: int, comment: str) -> ApprovalRecordOut:
@@ -86,6 +104,15 @@ class ApprovalService:
             req.status = target_status
             await req.save()
             rec = await approval_repository.create_record(req, operator_id, action=ApprovalAction.REJECT, comment=comment)
+            payload = {
+                "approval_id": req.id,
+                "applicant_id": req.applicant.id,
+                "approver_id": req.approver.id,
+                "title": req.title,
+                "action": ApprovalAction.REJECT,
+                "reason": rec.comment,
+            }
+            await outbox_service.publish_event("approval.passed", payload)
             return ApprovalRecordOut.model_validate(rec)
 
     async def cancel(self, approval_id: int, operator_id: int, comment: str|None) -> ApprovalRecordOut:

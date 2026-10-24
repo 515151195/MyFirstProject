@@ -46,6 +46,11 @@ class ApprovalAction(str, Enum):
     CANCEL = "cancel"
     SUBMIT = "submit"
 
+class OutboxStatus(str, Enum):
+    PENDING = "pending"
+    DELIVERED = "delivered"
+    FAILED = "failed"
+
 class BaseModel(models.Model):
     id = fields.BigIntField(pk=True, index=True)
 
