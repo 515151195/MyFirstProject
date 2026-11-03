@@ -3,7 +3,6 @@ from .base import BaseModel, TimestampMixin, OutboxStatus
 from tortoise import fields
 
 class OutboxMessage(BaseModel, TimestampMixin):
-    event_id = fields.CharField(max_length=64, unique=True, index=True)
     event_type = fields.CharField(max_length=128, index=True)
     payload = fields.TextField()
     status = fields.CharEnumField(OutboxStatus, default=OutboxStatus.PENDING, index=True)

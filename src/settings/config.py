@@ -1,5 +1,11 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
+from dotenv import load_dotenv
+
+
+import os
+
+load_dotenv()
 
 HOME = Path(__file__).parent.parent.parent
 
@@ -10,6 +16,12 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore"
     )
+
+    REDIS_HOST = os.getenv("REDIS_HOST", "127.0.0.1")
+    REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+    REDIS_DB = int(os.getenv("REDIS_DB", 0))
+
+    OUTBOX_BACKOFF_POLL_DELAY = int(os.getenv("OUTBOX_BACKOFF_POLL_DELAY", 30))
 
     APP_TITLE: str
     VERSION: str

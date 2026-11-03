@@ -112,7 +112,7 @@ class ApprovalService:
                 "action": ApprovalAction.REJECT,
                 "reason": rec.comment,
             }
-            await outbox_service.publish_event("approval.passed", payload)
+            await outbox_service.publish_event("approval.rejected", payload)
             return ApprovalRecordOut.model_validate(rec)
 
     async def cancel(self, approval_id: int, operator_id: int, comment: str|None) -> ApprovalRecordOut:
