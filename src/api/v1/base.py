@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from schemas.auth import Credentials, RefreshRequest, ChangePassword
 from repositories import user_repository
 from settings.config import settings
@@ -8,13 +8,22 @@ from models import User
 from schemas.base import ResponseBase
 from core.dependencies import get_current_user
 from utils.password import verify_password, hash_password
+from core.limiter import limiter
 
 from tortoise.expressions import Q
+from slowapi.util import get_remote_address
 
 router = APIRouter()
 
+def login_func(request: Request):
+    user = getattr(request.state, "user", None)
+    if user is None:
+        return get_remote_address(request)
+    return f"invite:uid:{user.id}"
+
 @router.post("/login")
-async def login(credentials: Credentials):
+@limiter.limit("5/minute", key_func=login_func)
+async def login(request: Request, credentials: Credentials):
     user = await user_repository.authenticate(credentials)
     await user_repository.update_last_login(user)
     access_token, refresh_token = create_token_pair(user.id)

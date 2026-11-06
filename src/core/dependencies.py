@@ -1,16 +1,16 @@
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from utils.my_jwt import decode_token
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from models import User
 
 import jwt
 
 security = HTTPBearer()
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_current_user(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="failed"
+        detail="Invalid or expired access token"
     )
     try:
         token = credentials.credentials
@@ -25,6 +25,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise credentials_exception
     elif not user.is_active:
         raise credentials_exception
+    request.state.user = user
     return user
 
 async def require_admin(current_user: User = Depends(get_current_user)):

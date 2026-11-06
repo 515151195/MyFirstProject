@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from slowapi.util import get_remote_address
 
 from schemas.approval import ApprovalCreate, ApprovalRequestOut, ApprovalRecordOut
 from core.dependencies import get_current_user
@@ -6,12 +7,25 @@ from models import User
 from schemas.base import ResponseBase
 from services import approval_service
 from repositories import approval_repository
+from core.limiter import limiter
 
 
 router = APIRouter()
 
+def approval_key(request: Request) -> str:
+    user = getattr(request.state, "user", None)
+    if user is None:
+        return get_remote_address(request)
+    return f"invite:uid:{user.id}"
+
 @router.post("/organization/{org_id}/draft", summary="Create approval draft")
-async def create_draft(org_id: int, approval_data: ApprovalCreate, user: User = Depends(get_current_user)) -> ResponseBase[ApprovalRequestOut]:
+@limiter.limit("1/10second", key_func=approval_key)
+async def create_draft(
+        request: Request,
+        org_id: int,
+        approval_data: ApprovalCreate,
+        user: User = Depends(get_current_user)
+) -> ResponseBase[ApprovalRequestOut]:
     data = await approval_service.create_draft(
         org_id=org_id,
         title=approval_data.title,

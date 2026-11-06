@@ -4,6 +4,7 @@ import json
 
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 from tortoise.exceptions import DoesNotExist, IntegrityError
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from settings import settings
@@ -195,3 +196,42 @@ async def UnhandledExceptionHandle(request: Request, exc: Exception) -> JSONResp
 
     content = {"code": 500, "msg": msg}
     return JSONResponse(content=content, status_code=500)
+
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    retry_after = int(exc.limit.limit.get_expiry())
+    error_details = {
+        "method": request.method,
+        "url": str(request.url),
+        "path": request.url.path,
+        "query_params": dict(request.query_params),
+        "client_ip": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent"),
+        "exception_type": type(exc).__name__,
+        "exception_msg": str(exc),
+        "exception_module": getattr(exc, "__module__", "unknown"),
+    }
+
+    try:
+        if hasattr(request, "_body"):
+            error_details["request_body_size"] = (
+                len(request._body) if request._body else 0
+            )
+    except Exception:
+        pass
+
+    logger.warning(
+        f"Rate limit exceeded: {request.method} {request.url.path} - {type(exc).__name__}: {exc}",
+        extra=error_details
+    )
+
+    content = {
+        "code": 429,
+        "msg": "请求过于频繁，请稍后再试",
+        "data": None,
+        "retry_after": retry_after,
+    }
+    return JSONResponse(
+        content=content,
+        status_code=429,
+        headers={"Retry-After": str(retry_after)},
+    )

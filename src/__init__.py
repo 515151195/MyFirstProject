@@ -14,6 +14,7 @@ from api import api_router
 from fastapi.responses import JSONResponse
 from log.logging_config import set_up_logging
 from core.init_app import register_exceptions
+from core.limiter import register_limiter
 
 set_up_logging()
 
@@ -33,29 +34,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         middleware=make_middlewares(),
     )
-    """
-    @app.exception_handler(ValueError)
-    async def ve_exception_handler(request: Request, exc: ValueError):
-        return JSONResponse(
-            status_code=400,
-            content={
-                "code": 400,
-                "msg": str(exc)
-            }
-        )
-
-    @app.exception_handler(Exception)
-    async def global_exception_handler(request: Request, exc: Exception):
-        return JSONResponse(
-            status_code=500,
-            content={
-                "code": 500,
-                "msg": "服务器内部错误"
-            }
-        )
-
-    """
     register_exceptions(app=app)
+
+    register_limiter(app=app)
+
     app.include_router(api_router, prefix="/api")
     return app
 

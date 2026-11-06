@@ -5,14 +5,27 @@ from schemas.membership import MembershipOut
 from core.dependencies import get_current_user, require_admin
 from core.permissions import require_org_owner, require_org_role
 from services import inv_service
+from core.limiter import limiter
 
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Request
+from slowapi.util import get_remote_address
 
 
 router = APIRouter()
 
+def invite_key(request: Request) -> str:
+    user = getattr(request.state, "user", None)
+    if user is None:
+        return get_remote_address(request)
+    return f"invite:uid:{user.id}"
+
 @router.post("/organization/invitation", summary="Invite user")
+@limiter.limit(
+    "3/minute",
+    key_func=invite_key
+)
 async def invite(
+        request: Request,
         inv_info: InvitationCreate,
         user: User = Depends(get_current_user)
 ) -> ResponseBase[InvitationOut]:
