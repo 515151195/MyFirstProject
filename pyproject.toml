@@ -14,6 +14,17 @@ dependencies = [
     "PyJWT==2.15.0",
     "passlib==1.7.4",
     "argon2-cffi==25.1.0",
+    "python-dotenv==1.2.3",
+    "pytz==2026.5",
+    "arq==0.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "pytest-cov==7.1.0",
+    "httpx==0.28.1",
 ]
 
 [tool.uv]
@@ -21,3 +32,24 @@ package = false
 
 [tool.tortoise]
 tortoise_orm = "src.settings.tortoise.TORTOISE_ORM"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+markers = [
+    "unit: fast tests without a database",
+    "integration: tests that require a real MySQL database",
+    "concurrency: tests that exercise database locking and races",
+    "worker: tests for ARQ workers and background jobs",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

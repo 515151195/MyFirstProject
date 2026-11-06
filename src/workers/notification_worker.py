@@ -7,9 +7,7 @@ from src.services.not_service import notification_service
 
 
 async def consume_single_outbox(ctx: dict, outbox_id: int):
-    """【实时消费任务】只消费指定id的一条outbox记录，publish_event触发调用"""
     arq_redis: ArqRedis = ctx["arq_redis"]
-    # 加行锁，防止并发重复消费
     async with in_transaction():
         event = await OutboxMessage.select_for_update().get_or_none(
             id=outbox_id,
@@ -51,7 +49,6 @@ async def consume_single_outbox(ctx: dict, outbox_id: int):
 
 
 async def backfill_poll_outbox(ctx: dict):
-    """【兜底轮询任务】低频扫描，捞Redis丢任务、ARQ崩溃漏掉的pending消息"""
     pending_events = await OutboxMessage.filter(
         status=OutboxStatus.PENDING
     ).limit(10).order_by("created_at")

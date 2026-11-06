@@ -31,7 +31,7 @@ def set_up_logging(level: int = logging.INFO) -> None:
 
     file_handler = logging.FileHandler("app.log", mode="w", encoding="utf-8")
     file_handler.addFilter(RequestIdFilter())
-    handler.setFormatter(PlainFormatter())
+    file_handler.setFormatter(PlainFormatter())
 
     root_logger = logging.getLogger()
     root_logger.handlers.clear()

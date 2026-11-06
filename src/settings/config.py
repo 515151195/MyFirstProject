@@ -17,11 +17,13 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    REDIS_HOST = os.getenv("REDIS_HOST", "127.0.0.1")
-    REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-    REDIS_DB = int(os.getenv("REDIS_DB", 0))
+    REDIS_HOST: str
+    REDIS_PORT: int
+    REDIS_DB: int
 
-    OUTBOX_BACKOFF_POLL_DELAY = int(os.getenv("OUTBOX_BACKOFF_POLL_DELAY", 30))
+    OUTBOX_BACKOFF_POLL_DELAY: int = int(
+        os.getenv("OUTBOX_BACKOFF_POLL_DELAY", 30)
+    )
 
     APP_TITLE: str
     VERSION: str
